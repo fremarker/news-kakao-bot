@@ -149,15 +149,22 @@ def summarize_with_gemini(articles: list, category: str) -> str:
 요약은 간결하고 명확하게, 전문 용어는 한국어로 자연스럽게 번역해주세요.
 """
 
-    try:
-        response = client.models.generate_content(
-            model="gemini-flash-latest",
-            contents=prompt,
-        )
-        return response.text
-    except Exception as e:
-        print(f"❌ Gemini 오류: {e}")
-        return "요약 생성 중 오류가 발생했습니다."
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = client.models.generate_content(
+                model="gemini-flash-latest",
+                contents=prompt,
+            )
+            return response.text
+        except Exception as e:
+            print(f"❌ Gemini 오류 (시도 {attempt}/{max_retries}): {e}")
+            if attempt < max_retries:
+                wait = 15 * attempt
+                print(f"   ⏳ {wait}초 후 재시도...")
+                time.sleep(wait)
+            else:
+                return "요약 생성 중 오류가 발생했습니다."
 
 # ──────────────────────────────────────────────
 # 카카오톡 발송
@@ -239,7 +246,7 @@ def run():
     ok = send_with_auto_refresh(ai_message)
     print(f"   → {'✅ 성공' if ok else '❌ 실패'}")
 
-    time.sleep(3)
+    time.sleep(20)
 
     # ── 2. 국제정치 뉴스 ──
     print("\n📡 국제정치 뉴스 수집 중...")
