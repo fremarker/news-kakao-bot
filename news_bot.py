@@ -91,7 +91,7 @@ def refresh_access_token(refresh_token: str):
 # 뉴스 수집
 # ──────────────────────────────────────────────
 
-def fetch_articles(feeds: list, max_per_feed: int = 5) -> list:
+def fetch_articles(feeds: list, max_per_feed: int = 8) -> list:
     articles    = []
     seen_titles = set()
 
@@ -114,6 +114,33 @@ def fetch_articles(feeds: list, max_per_feed: int = 5) -> list:
         except Exception as e:
             print(f"⚠️  피드 오류 ({url[:50]}...): {e}")
 
+    return score_by_coverage(articles)
+
+def _keywords(text: str) -> set:
+    """제목에서 핵심 키워드(4글자 이상 단어) 추출 — 단순 중복 주제 탐지용"""
+    words = text.lower().replace(",", " ").replace(".", " ").split()
+    return {w for w in words if len(w) >= 4}
+
+def score_by_coverage(articles: list) -> list:
+    """같은 주제를 다루는 매체 수가 많을수록 높은 점수 부여 (화제성 신호)"""
+    for a in articles:
+        a["_kw"] = _keywords(a["title"])
+
+    for a in articles:
+        covering_sources = set()
+        for b in articles:
+            if a["_kw"] and b["_kw"]:
+                overlap = len(a["_kw"] & b["_kw"]) / max(len(a["_kw"]), 1)
+                if overlap >= 0.4:
+                    covering_sources.add(b["source"])
+        a["coverage_count"] = len(covering_sources)
+
+    # coverage_count 내림차순 정렬 (같은 주제를 많이 다룰수록 앞으로)
+    articles.sort(key=lambda x: x["coverage_count"], reverse=True)
+
+    for a in articles:
+        del a["_kw"]
+
     return articles
 
 # ──────────────────────────────────────────────
@@ -125,28 +152,31 @@ def summarize_with_gemini(articles: list, category: str) -> str:
         return "관련 뉴스를 찾지 못했습니다."
 
     articles_text = ""
-    for i, a in enumerate(articles[:10], 1):
-        articles_text += f"{i}. [{a['source']}] {a['title']}\n"
+    for i, a in enumerate(articles[:15], 1):
+        coverage = a.get("coverage_count", 1)
+        articles_text += f"{i}. [{a['source']}] (유사 보도 매체 수: {coverage}) {a['title']}\n"
         if a["summary"]:
             articles_text += f"   {a['summary']}\n"
         articles_text += f"   🔗 {a['link']}\n\n"
 
-    prompt = f"""당신은 전문 뉴스 큐레이터입니다.
-아래는 오늘의 {category} 관련 최신 해외 뉴스입니다.
+    prompt = f"""당신은 SNS(스레드) 클릭률을 중시하는 뉴스 큐레이터입니다.
+아래는 오늘의 {category} 관련 최신 해외 뉴스이며, "유사 보도 매체 수"는 같은 주제를
+여러 매체가 동시에 다룬 정도(화제성 신호)입니다.
 
 [뉴스 목록]
 {articles_text}
 
-다음 형식으로 한국어 요약을 작성해주세요:
+다음 기준으로 한국어 요약을 작성해주세요:
 
-1. 가장 중요한 뉴스 3~5개를 선별하세요.
-2. 각 뉴스마다:
-   - 📌 핵심 내용을 2~3문장으로 한국어로 요약
+1. 유사 보도 매체 수가 높은 것(화제성 큼) + 임팩트가 큰 사건을 우선 고려해서, 가장 핫한 뉴스 7개를 선별하세요.
+2. 각 뉴스마다 아래 형식을 지키세요:
+   - 제목: 팩트에 기반하되, 클릭하고 싶게 만드는 자극적이고 흥미로운 한 줄 제목 (낚시성 거짓은 금지, 사실 왜곡 없이 호기심을 자극하는 표현 사용)
+   - 요약: 핵심만 한 문장으로 짧게 (지금까지보다 훨씬 간결하게, 군더더기 없이)
    - 출처는 원문 그대로 표기 (예: [TechCrunch], [Reuters])
    - 원문 링크 포함
-3. 마지막에 오늘의 전체 트렌드를 1~2문장으로 정리
+3. 트렌드 정리, 부가 설명은 생략하세요.
 
-요약은 간결하고 명확하게, 전문 용어는 한국어로 자연스럽게 번역해주세요.
+전문 용어는 한국어로 자연스럽게 번역하고, 전체 분량은 최대한 짧게 유지해 7개 항목이 모두 들어가도록 하세요.
 """
 
     max_retries = 3
@@ -176,8 +206,8 @@ def send_kakao_message(access_token: str, message: str) -> bool:
         "Authorization": f"Bearer {access_token}",
         "Content-Type":  "application/x-www-form-urlencoded",
     }
-    if len(message) > 2000:
-        message = message[:1997] + "..."
+    if len(message) > 1990:
+        message = message[:1987] + "..."
 
     template = {
         "object_type": "text",
@@ -200,23 +230,54 @@ def send_kakao_message(access_token: str, message: str) -> bool:
         print(f"❌ 카카오 발송 오류: {res.status_code} {res.text}")
         return False
 
+def split_message(message: str, chunk_size: int = 1900) -> list:
+    """긴 메시지를 카카오톡 글자수 제한에 맞춰 여러 개로 분할"""
+    if len(message) <= chunk_size:
+        return [message]
+
+    chunks = []
+    lines  = message.split("\n")
+    current = ""
+
+    for line in lines:
+        if len(current) + len(line) + 1 > chunk_size:
+            chunks.append(current)
+            current = line
+        else:
+            current = current + "\n" + line if current else line
+
+    if current:
+        chunks.append(current)
+
+    total = len(chunks)
+    return [f"{c}\n\n({i+1}/{total})" for i, c in enumerate(chunks)]
+
 def send_with_auto_refresh(message: str):
     tokens       = load_tokens()
     access_token = tokens.get("access_token", "")
 
-    success = send_kakao_message(access_token, message)
+    chunks = split_message(message)
+    all_success = True
 
-    if not success:
-        print("🔄 토큰 갱신 중...")
-        new_tokens = refresh_access_token(tokens.get("refresh_token", ""))
-        if new_tokens:
-            tokens["access_token"] = new_tokens["access_token"]
-            if "refresh_token" in new_tokens:
-                tokens["refresh_token"] = new_tokens["refresh_token"]
-            save_tokens(tokens)
-            success = send_kakao_message(tokens["access_token"], message)
+    for idx, chunk in enumerate(chunks):
+        success = send_kakao_message(access_token, chunk)
 
-    return success
+        if not success:
+            print("🔄 토큰 갱신 중...")
+            new_tokens = refresh_access_token(tokens.get("refresh_token", ""))
+            if new_tokens:
+                tokens["access_token"] = new_tokens["access_token"]
+                if "refresh_token" in new_tokens:
+                    tokens["refresh_token"] = new_tokens["refresh_token"]
+                save_tokens(tokens)
+                success = send_kakao_message(tokens["access_token"], chunk)
+
+        all_success = all_success and success
+
+        if idx < len(chunks) - 1:
+            time.sleep(2)  # 분할 메시지 사이 짧은 대기
+
+    return all_success
 
 # ──────────────────────────────────────────────
 # 메인 실행
