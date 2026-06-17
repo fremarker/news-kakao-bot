@@ -20,7 +20,7 @@ jobs:
           python-version: "3.11"
 
       - name: 패키지 설치
-        run: pip install feedparser anthropic requests python-dotenv
+        run: pip install --upgrade pip && pip install feedparser google-genai requests python-dotenv
 
       - name: 카카오 토큰 파일 복원
         run: |
@@ -28,10 +28,9 @@ jobs:
 
       - name: 뉴스봇 실행
         env:
-          ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY:     ${{ secrets.GEMINI_API_KEY }}
           KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
         run: python news_bot.py
 
       - name: 갱신된 토큰 저장 (선택사항)
-        # 토큰이 갱신됐을 경우 Secret 업데이트하려면 별도 스크립트 필요
         run: echo "토큰 갱신 완료 (kakao_token.json 로컬 저장)"
