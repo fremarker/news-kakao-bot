@@ -1,0 +1,32 @@
+name: 뉴스봇 자동실행 v2
+
+on:
+  schedule:
+    - cron: "8 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  run-news-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 패키지 설치
+        run: pip install --upgrade pip && pip install feedparser google-genai requests python-dotenv
+
+      - name: 카카오 토큰 파일 복원
+        run: |
+          echo '${{ secrets.KAKAO_TOKEN_JSON }}' > kakao_token.json
+
+      - name: 뉴스봇 실행
+        env:
+          GEMINI_API_KEY:     ${{ secrets.GEMINI_API_KEY }}
+          KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+        run: python news_bot.py
