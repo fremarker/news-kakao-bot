@@ -3,7 +3,7 @@ name: 뉴스봇 자동 실행
 on:
   schedule:
     # 매일 오전 7시 30분 (KST) = UTC 22:30 전날
-    - cron: "30 22 * * *"
+    - cron: "6 1 * * *"
   workflow_dispatch:   # 수동 실행 버튼도 활성화
 
 jobs:
