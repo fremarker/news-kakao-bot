@@ -34,3 +34,6 @@ jobs:
 
       - name: 갱신된 토큰 저장 (선택사항)
         run: echo "토큰 갱신 완료 (kakao_token.json 로컬 저장)"
+
+# 재등록 트리거 2026-06-18
+name: 뉴스봇 자동 실행
