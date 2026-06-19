@@ -189,7 +189,7 @@ def curate_with_gemini(articles: list, category: str, n: int = ARTICLES_PER_CATE
     for attempt in range(1, max_retries + 1):
         try:
             response = client.models.generate_content(
-                model="gemini-2.5-flash-lite-preview-06-17",
+                model="gemini-2.5-flash",
                 contents=prompt,
             )
             text = response.text.strip()
