@@ -177,6 +177,8 @@ def curate_with_gemini(articles: list, category: str, n: int = ARTICLES_PER_CATE
   "title": "팩트에 기반하되 클릭하고 싶게 만드는 자극적이고 흥미로운 한 줄 제목 (낚시성 거짓 금지, 사실 왜곡 없이 호기심 자극)",
   "summary": "핵심만 담은 한 문장 요약",
   "insight": "아래 4가지 관점 중 이 기사에 가장 잘 맞는 1~2개를 골라 2줄로 작성한 통찰 (추측은 '~할 가능성' 등으로 신중하게 표현). 관점: (a)파급력-다른 산업/국가/사람들에게 미칠 연쇄효과 (b)숨은 맥락-표면적 발표 뒤 진짜 의도나 배경 (c)선례 비교-과거 비슷한 사례와 다른 점 (d)다음 단계-이후 일어날 가능성이 높은 일",
+  "korea_impact": "이 뉴스가 한국(산업·경제·외교·사회 등)에 미칠 구체적 영향을 1~2줄로 분석. 해당 없으면 '직접 영향 제한적'이라고 명시",
+  "korea_response": "한국 기업·정부·개인이 취할 수 있는 현실적 대응 또는 주목해야 할 포인트를 1~2줄로 제안",
   "source": "원문 매체명 그대로 (예: TechCrunch, Reuters)",
   "link": "원문 링크 그대로"
 }}
@@ -265,23 +267,29 @@ def send_with_auto_refresh(message: str) -> bool:
 # ──────────────────────────────────────────────
 
 def build_article_message(icon: str, category: str, idx: int, total: int, article: dict) -> str:
-    now_kst = datetime.now(KST).strftime("%Y-%m-%d %H:%M")
-    title    = article.get("title", "(제목 없음)")
-    summary  = article.get("summary", "")
-    insight  = article.get("insight", "")
-    source   = article.get("source", "")
-    link     = article.get("link", "")
+    now_kst       = datetime.now(KST).strftime("%Y-%m-%d %H:%M")
+    title         = article.get("title", "(제목 없음)")
+    summary       = article.get("summary", "")
+    insight       = article.get("insight", "")
+    korea_impact  = article.get("korea_impact", "")
+    korea_response= article.get("korea_response", "")
+    source        = article.get("source", "")
+    link          = article.get("link", "")
 
-    return (
+    msg = (
         f"{icon} [{category}] ({idx}/{total})\n"
         f"🕐 {now_kst} KST\n"
         f"{'─' * 22}\n"
         f"📌 {title}\n\n"
         f"{summary}\n\n"
         f"💡 인사이트\n{insight}\n\n"
-        f"출처: {source}\n"
-        f"🔗 {link}"
     )
+    if korea_impact:
+        msg += f"🇰🇷 한국 영향\n{korea_impact}\n\n"
+    if korea_response:
+        msg += f"📋 대응 포인트\n{korea_response}\n\n"
+    msg += f"출처: {source}\n🔗 {link}"
+    return msg
 
 def send_category(icon: str, category: str, feeds: list):
     print(f"\n📡 {category} 뉴스 수집 중...")
