@@ -184,7 +184,8 @@ def curate_with_gemini(articles: list, category: str, n: int = ARTICLES_PER_CATE
 전문 용어는 한국어로 자연스럽게 번역하세요. 반드시 유효한 JSON 배열로만 응답하세요.
 """
 
-    max_retries = 3
+    max_retries = 4
+    wait_times  = [30, 60, 120]  # 1차실패→30초, 2차실패→60초, 3차실패→120초 대기
     for attempt in range(1, max_retries + 1):
         try:
             response = client.models.generate_content(
@@ -201,7 +202,7 @@ def curate_with_gemini(articles: list, category: str, n: int = ARTICLES_PER_CATE
         except Exception as e:
             print(f"❌ Gemini 오류 (시도 {attempt}/{max_retries}): {e}")
             if attempt < max_retries:
-                wait = 15 * attempt
+                wait = wait_times[attempt - 1]
                 print(f"   ⏳ {wait}초 후 재시도...")
                 time.sleep(wait)
             else:
