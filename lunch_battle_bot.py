@@ -29,6 +29,7 @@ BOLD_MAP = str.maketrans(
 )
 
 def bold(text: str) -> str:
+    """숫자·영문을 유니코드 볼드체로 변환 (카톡 텍스트엔 폰트 크기 조절이 없어 대신 사용)"""
     return text.translate(BOLD_MAP)
 
 # ── 카카오 토큰 관리 (뉴스봇과 동일 구조) ───────────────
