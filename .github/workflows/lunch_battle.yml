@@ -2,8 +2,10 @@ name: 점심대결 자동실행
 
 on:
   schedule:
-    - cron: "25 2 * * *"   # 매일 10:50 KST (UTC 01:50)
+    - cron: "0 2 * * *"   # 매일 11:00 KST (UTC 02:00) - 보조용, 불안정할 수 있음
   workflow_dispatch:
+  repository_dispatch:
+    types: [run-lunch-bot]
 
 jobs:
   run-lunch-bot:
